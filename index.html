@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Singularity Lab</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./main.js" defer></script>
+    <script src="./gravity.js" defer></script>
+  </head>
+  <body>
+    <canvas id="scene" aria-label="Interactive black hole simulation"></canvas>
+    <canvas id="objectLayer" aria-hidden="true"></canvas>
+
+    <div class="backdrop" aria-hidden="true">
+      <div class="backdrop__gradient"></div>
+      <div class="backdrop__mesh"></div>
+      <div class="backdrop__noise"></div>
+    </div>
+
+    <main class="hud">
+      <section class="hero">
+        <p class="eyebrow">3D BLACK HOLE SIMULATION</p>
+        <h1>Singularity Lab</h1>
+        <p class="lede">
+          Bend starlight, spin up the accretion disk, then drag across the scene to throw rocks,
+          probes, and comets into slingshots, decays, and the event horizon.
+        </p>
+
+        <div class="hero__meta">
+          <span class="pill" id="renderModeBadge">Stylized lensing</span>
+          <span class="pill" id="fpsBadge">-- fps</span>
+          <span class="pill" id="bodyCountBadge">0 bodies</span>
+          <span class="pill">Orbit mode: drag • Throw mode: drag to launch</span>
+        </div>
+
+        <p class="status" id="statusLine">
+          Throw mode is armed. Drag in the scene to launch objects into the gravity well.
+        </p>
+      </section>
+
+      <aside class="panel">
+        <div class="panel__header">
+          <div>
+            <p class="panel__eyebrow">Field Controls</p>
+            <h2>Shape the singularity</h2>
+          </div>
+
+          <button class="button button--ghost button--small" id="randomizeButton" type="button">Chaos</button>
+        </div>
+
+        <div class="controls">
+          <label class="control">
+            <div class="control__top">
+              <span>Mass</span>
+              <output data-output="mass">1.35</output>
+            </div>
+            <input data-control="mass" type="range" min="0.85" max="2.4" step="0.01" value="1.35" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Spin</span>
+              <output data-output="spin">0.72</output>
+            </div>
+            <input data-control="spin" type="range" min="0" max="1.4" step="0.01" value="0.72" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Disk Density</span>
+              <output data-output="diskIntensity">1.15</output>
+            </div>
+            <input data-control="diskIntensity" type="range" min="0.35" max="2.3" step="0.01" value="1.15" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Lensing</span>
+              <output data-output="lens">1.4</output>
+            </div>
+            <input data-control="lens" type="range" min="0.7" max="2.8" step="0.01" value="1.4" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Turbulence</span>
+              <output data-output="turbulence">0.55</output>
+            </div>
+            <input data-control="turbulence" type="range" min="0" max="1.25" step="0.01" value="0.55" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Glow</span>
+              <output data-output="glow">0.85</output>
+            </div>
+            <input data-control="glow" type="range" min="0.1" max="1.6" step="0.01" value="0.85" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Exposure</span>
+              <output data-output="exposure">1.28</output>
+            </div>
+            <input data-control="exposure" type="range" min="0.6" max="2.4" step="0.01" value="1.28" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Zoom</span>
+              <output data-output="zoom">6.6</output>
+            </div>
+            <input data-control="zoom" type="range" min="4.8" max="16" step="0.1" value="6.6" />
+          </label>
+
+          <label class="control">
+            <div class="control__top">
+              <span>Time Flow</span>
+              <output data-output="timeScale">1</output>
+            </div>
+            <input data-control="timeScale" type="range" min="0" max="2.5" step="0.01" value="1" />
+          </label>
+        </div>
+
+        <section class="launcher">
+          <div class="launcher__header">
+            <div>
+              <p class="panel__eyebrow">Gravity Playground</p>
+              <h3 class="launcher__title">Throw objects</h3>
+            </div>
+            <button class="button button--ghost button--small" id="clearBodiesButton" type="button">Clear</button>
+          </div>
+
+          <div class="chipRow" id="throwablePicker">
+            <button class="chip is-active" data-throwable="rock" type="button">Rock</button>
+            <button class="chip" data-throwable="probe" type="button">Probe</button>
+            <button class="chip" data-throwable="comet" type="button">Comet</button>
+          </div>
+
+          <div class="controls controls--compact">
+            <label class="control">
+              <div class="control__top">
+                <span>Throw Power</span>
+                <output data-output="throwPower">5</output>
+              </div>
+              <input data-control="throwPower" type="range" min="2" max="5" step="0.1" value="5" />
+            </label>
+
+            <label class="control">
+              <div class="control__top">
+                <span>Orbit Assist</span>
+                <output data-output="orbitAssist">0.58</output>
+              </div>
+              <input data-control="orbitAssist" type="range" min="0" max="0.6" step="0.01" value="0.58" />
+            </label>
+          </div>
+
+          <div class="launcher__actions">
+            <button class="button button--active" id="launchModeButton" type="button">Throw Mode On</button>
+            <button class="button button--ghost" id="burstButton" type="button">Spawn Ring</button>
+          </div>
+
+          <p class="panel__hint">
+            Throw Mode uses drag-to-launch on the scene. Switch it off any time to go back to free camera orbiting.
+          </p>
+        </section>
+
+        <div class="toggleGrid">
+          <label class="toggle">
+            <input data-toggle="raytrace" type="checkbox" />
+            <span class="toggle__track"></span>
+            <span class="toggle__copy">
+              <strong>Raytracing</strong>
+              <small>Denser path bending and richer ring detail.</small>
+            </span>
+          </label>
+
+          <label class="toggle">
+            <input data-toggle="bloom" type="checkbox" checked />
+            <span class="toggle__track"></span>
+            <span class="toggle__copy">
+              <strong>Bloom Halo</strong>
+              <small>Push the glow around the photon sphere.</small>
+            </span>
+          </label>
+
+          <label class="toggle">
+            <input data-toggle="chromatic" type="checkbox" checked />
+            <span class="toggle__track"></span>
+            <span class="toggle__copy">
+              <strong>Chromatic Fringe</strong>
+              <small>Subtle spectral warping around the rim.</small>
+            </span>
+          </label>
+
+          <label class="toggle">
+            <input data-toggle="starfield" type="checkbox" checked />
+            <span class="toggle__track"></span>
+            <span class="toggle__copy">
+              <strong>Starfield</strong>
+              <small>Keep the galaxy backdrop alive.</small>
+            </span>
+          </label>
+
+          <label class="toggle">
+            <input data-toggle="orbit" type="checkbox" checked />
+            <span class="toggle__track"></span>
+            <span class="toggle__copy">
+              <strong>Auto Orbit</strong>
+              <small>Let the camera drift around the event horizon.</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button class="button button--ghost" id="resetButton" type="button">Reset</button>
+          <button class="button" id="cinematicButton" type="button">Cinematic Mode</button>
+        </div>
+      </aside>
+    </main>
+  </body>
+</html>
+
+

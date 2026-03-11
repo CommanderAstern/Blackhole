@@ -1,0 +1,2 @@
+This file was created with apply_patch.
+Small test successful.
