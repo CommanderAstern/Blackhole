@@ -376,9 +376,7 @@ function simulateBodies(delta) {
         continue;
       }
 
-      const acceleration = getGravityAcceleration(body.position, body.agility);
-      body.velocity = add(body.velocity, scale(acceleration, step));
-      body.position = add(body.position, scale(body.velocity, step));
+      advanceBody(body, step);
       body.age += step;
       body.heat = clamp(1.0 - (radius - getEventHorizonRadius()) / (getEventHorizonRadius() * 6.0), 0.0, 1.0);
       body.trail.push(body.position.slice());
@@ -390,21 +388,45 @@ function simulateBodies(delta) {
   }
 }
 
-function getGravityAcceleration(position, agility) {
-  const radius = Math.max(lengthOf(position), 0.0001);
-  const radial = scale(position, 1 / radius);
-  let acceleration = scale(radial, -(15.0 + lab.state.mass * 10.0) / (radius * radius + 0.45));
+function advanceBody(body, step) {
+  const acceleration = getGravityAcceleration(body.position, body.velocity, body.agility);
+  body.velocity = add(body.velocity, scale(acceleration, step));
 
-  let swirl = cross([0, 1, 0], radial);
-  if (lengthOf(swirl) < 0.0001) {
-    swirl = cross([1, 0, 0], radial);
+  const damping = getAccretionDrag(body.position, body.agility);
+  if (damping > 0) {
+    body.velocity = scale(body.velocity, Math.max(0, 1 - damping * step));
   }
 
-  swirl = normalize(swirl);
-  acceleration = add(acceleration, scale(swirl, lab.state.spin * (0.35 + agility * 0.45) / (radius * radius + 1.0)));
+  body.position = add(body.position, scale(body.velocity, step));
+}
 
-  if (Math.abs(position[1]) < 0.95 && radius > getEventHorizonRadius() * 1.4) {
-    acceleration = add(acceleration, scale(swirl, lab.state.orbitAssist * 0.38 / (radius + 1.0)));
+function getGravityAcceleration(position, velocity, agility) {
+  const radius = Math.max(lengthOf(position), 0.0001);
+  const radial = scale(position, 1 / radius);
+  const orbitSpeed = getLocalOrbitSpeed(position);
+  const effectiveRadius = getEffectiveGravityRadius(radius);
+  let acceleration = scale(radial, -getLocalGravityStrength(position));
+
+  let tangent = cross([0, 1, 0], radial);
+  if (lengthOf(tangent) < 0.0001) {
+    tangent = cross([1, 0, 0], radial);
+  }
+
+  tangent = normalize(tangent);
+
+  const tangentialVelocity = dot(velocity, tangent);
+  const corotationTarget = orbitSpeed * (0.14 + lab.state.spin * 0.34);
+  const frameDragStrength = lab.state.spin * (0.5 + agility * 0.25) / (effectiveRadius + 1.45);
+  acceleration = add(
+    acceleration,
+    scale(tangent, (corotationTarget - tangentialVelocity) * frameDragStrength),
+  );
+
+  const diskOuter = getDiskOuterRadius() * 1.18;
+  if (radius < diskOuter) {
+    const diskBlend = clamp(1 - radius / diskOuter, 0, 1);
+    const verticalSettling = (0.14 + (1 - agility) * 0.1) * (0.4 + diskBlend * 0.9) / (effectiveRadius + 1.2);
+    acceleration = add(acceleration, [0, -position[1] * verticalSettling, 0]);
   }
 
   return acceleration;
@@ -663,17 +685,18 @@ function drawLaunchPreview(cameraPos, cameraBasis, occlusion) {
 
 function predictTrajectory(spawnPosition, initialVelocity, steps) {
   const points = [];
-  let position = spawnPosition.slice();
-  let velocity = initialVelocity.slice();
+  const body = {
+    position: spawnPosition.slice(),
+    velocity: initialVelocity.slice(),
+    agility: 1.0,
+  };
   const dt = 0.045;
 
   for (let stepIndex = 0; stepIndex < steps; stepIndex += 1) {
-    const acceleration = getGravityAcceleration(position, 1.0);
-    velocity = add(velocity, scale(acceleration, dt));
-    position = add(position, scale(velocity, dt));
-    points.push(position.slice());
+    advanceBody(body, dt);
+    points.push(body.position.slice());
 
-    if (lengthOf(position) < getEventHorizonRadius() * 1.05) {
+    if (lengthOf(body.position) < getEventHorizonRadius() * 1.05) {
       break;
     }
   }
@@ -883,9 +906,15 @@ function getShadowAngularRadius(cameraPos) {
   return (getEventHorizonRadius() / lengthOf(cameraPos)) * 0.62;
 }
 
+function getEffectiveGravityRadius(radius) {
+  const horizon = getEventHorizonRadius();
+  return Math.max(radius - horizon * 0.52, horizon * 0.62);
+}
+
 function getLocalGravityStrength(position) {
   const radius = Math.max(lengthOf(position), 0.0001);
-  return (15.0 + lab.state.mass * 10.0) / (radius * radius + 0.45);
+  const effectiveRadius = getEffectiveGravityRadius(radius);
+  return (15.0 + lab.state.mass * 10.0) / (effectiveRadius * effectiveRadius + 0.18);
 }
 
 function getLocalOrbitSpeed(position) {
@@ -895,6 +924,16 @@ function getLocalOrbitSpeed(position) {
 
 function getLocalEscapeSpeed(position) {
   return getLocalOrbitSpeed(position) * Math.SQRT2;
+}
+
+function getAccretionDrag(position, agility) {
+  const radius = Math.max(lengthOf(position), 0.0001);
+  const horizon = getEventHorizonRadius();
+  const diskOuter = getDiskOuterRadius() * 1.08;
+  const diskBlend = clamp(1 - (radius - horizon) / Math.max(diskOuter - horizon, 0.0001), 0, 1);
+  const planeBlend = clamp(1 - Math.abs(position[1]) / (horizon * 2.6), 0, 1);
+
+  return (0.08 + (1 - agility) * 0.12) * diskBlend * diskBlend * (0.25 + planeBlend * 0.75);
 }
 
 function add(a, b) {
