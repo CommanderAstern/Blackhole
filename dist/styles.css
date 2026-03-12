@@ -182,6 +182,13 @@ body.camera-drag #scene {
   font-size: 0.95rem;
 }
 
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
 .panel__hint {
   margin: 0;
   font-size: 0.9rem;
@@ -375,6 +382,9 @@ input[type="range"]::-moz-range-thumb {
 
 .button {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 999px;
   padding: 12px 18px;
@@ -383,6 +393,7 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
+  text-decoration: none;
   transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
   box-shadow: 0 12px 30px rgba(255, 152, 89, 0.18);
 }
