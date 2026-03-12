@@ -2,6 +2,8 @@
 
 A standalone black hole simulation built with plain HTML, CSS, and WebGL2.
 
+![Singularity Lab screenshot](./gravity-playground-fixed.png)
+
 ## Features
 
 - 3D orbitable camera around the black hole
