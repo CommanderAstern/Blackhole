@@ -780,6 +780,11 @@ function screenToLaunchPoint(screenX, screenY, cameraPos, cameraBasis) {
 function getLaunchVelocity(spawnPosition, dragX, dragY, cameraBasis) {
   const config = THROWABLES[selectedThrowable];
   const radial = normalize(spawnPosition);
+  const orbitAssist = orbitAssistStateToDisplay(lab.state.orbitAssist);
+  const orbitAssistMix = clamp(orbitAssist / ORBIT_ASSIST_DISPLAY_MAX, 0, 1);
+  const throwPowerMix = clamp((lab.state.throwPower - THROW_POWER_MIN) / (THROW_POWER_MAX - THROW_POWER_MIN), 0, 1);
+  const orbitSpeed = getLocalOrbitSpeed(spawnPosition);
+  const escapeSpeed = getLocalEscapeSpeed(spawnPosition);
   let tangent = cross([0, 1, 0], radial);
 
   if (lengthOf(tangent) < 0.0001) {
@@ -787,18 +792,18 @@ function getLaunchVelocity(spawnPosition, dragX, dragY, cameraBasis) {
   }
 
   tangent = normalize(tangent);
+  const dragDistance = Math.hypot(dragX, dragY);
+  const dragDirectionSeed = add(scale(cameraBasis.right, dragX), scale(cameraBasis.up, -dragY));
+  const dragDirection = dragDistance > 0.0001 ? normalize(dragDirectionSeed) : tangent;
+  const baseOrbitSpeed = orbitSpeed * (0.42 + orbitAssistMix * 0.42 + throwPowerMix * 0.08);
+  const inwardSpeed = orbitSpeed * (0.08 + (1 - orbitAssistMix) * 0.08);
+  const dragSpeed = escapeSpeed
+    * clamp(dragDistance / 220, 0, 1.35)
+    * (0.18 + throwPowerMix * 0.32);
 
-  const dragVelocity = add(
-    scale(cameraBasis.right, dragX * 0.014 * lab.state.throwPower),
-    scale(cameraBasis.up, -dragY * 0.014 * lab.state.throwPower),
-  );
-
-  let velocity = add(dragVelocity, scale(tangent, lab.state.throwPower * (0.42 + lab.state.orbitAssist * 0.9)));
-  velocity = add(velocity, scale(radial, -lab.state.throwPower * 0.18));
-
-  if (Math.hypot(dragX, dragY) < 8) {
-    velocity = add(velocity, scale(tangent, lab.state.throwPower * 0.36));
-  }
+  const dragVelocity = scale(dragDirection, dragSpeed);
+  let velocity = add(scale(tangent, baseOrbitSpeed), scale(radial, -inwardSpeed));
+  velocity = add(velocity, dragVelocity);
 
   return scale(velocity, config.speedScale);
 }
@@ -832,6 +837,8 @@ function spawnRingBurst() {
   const cameraBasis = lab.getCameraBasis(cameraPos);
   const count = selectedThrowable === "rock" ? 10 : 14;
   const ringRadius = 8.0 + lab.state.throwPower * 0.32;
+  const orbitAssistMix = clamp(orbitAssistStateToDisplay(lab.state.orbitAssist) / ORBIT_ASSIST_DISPLAY_MAX, 0, 1);
+  const throwPowerMix = clamp((lab.state.throwPower - THROW_POWER_MIN) / (THROW_POWER_MAX - THROW_POWER_MIN), 0, 1);
 
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
@@ -847,9 +854,13 @@ function spawnRingBurst() {
     }
 
     tangent = normalize(tangent);
+    const orbitSpeed = getLocalOrbitSpeed(spawnPosition);
     const velocity = add(
-      scale(tangent, lab.state.throwPower * 0.9 * THROWABLES[selectedThrowable].speedScale),
-      scale(normalize(spawnPosition), -lab.state.throwPower * 0.2),
+      scale(
+        tangent,
+        orbitSpeed * (0.78 + orbitAssistMix * 0.18 + throwPowerMix * 0.08) * THROWABLES[selectedThrowable].speedScale,
+      ),
+      scale(normalize(spawnPosition), -orbitSpeed * (0.16 + (1 - orbitAssistMix) * 0.12)),
     );
 
     spawnThrowable(selectedThrowable, spawnPosition, velocity);
@@ -870,6 +881,20 @@ function getDiskOuterRadius() {
 
 function getShadowAngularRadius(cameraPos) {
   return (getEventHorizonRadius() / lengthOf(cameraPos)) * 0.62;
+}
+
+function getLocalGravityStrength(position) {
+  const radius = Math.max(lengthOf(position), 0.0001);
+  return (15.0 + lab.state.mass * 10.0) / (radius * radius + 0.45);
+}
+
+function getLocalOrbitSpeed(position) {
+  const radius = Math.max(lengthOf(position), 0.0001);
+  return Math.sqrt(getLocalGravityStrength(position) * radius);
+}
+
+function getLocalEscapeSpeed(position) {
+  return getLocalOrbitSpeed(position) * Math.SQRT2;
 }
 
 function add(a, b) {
